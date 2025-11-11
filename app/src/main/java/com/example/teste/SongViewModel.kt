@@ -22,6 +22,9 @@ class SongViewModel : ViewModel() {
     private val _error = MutableLiveData<String?>()
     val error: LiveData<String?> get() = _error
 
+    private val _isPlaying = MutableLiveData<Boolean>(false)
+    val isPlaying: LiveData<Boolean> get() = _isPlaying
+
     fun loadSongs() {
         viewModelScope.launch {
             _isLoading.value = true
@@ -34,9 +37,11 @@ class SongViewModel : ViewModel() {
                     val convertedSongs = convertToSongList(songResponses)
                     _songs.value = convertedSongs
 
-                    // Set first song as current song
+                    // Set first song as current song but don't auto-play
                     if (convertedSongs.isNotEmpty()) {
                         setCurrentSong(0)
+                        // Set initial state to paused
+                        _isPlaying.value = false
                     }
                 } else {
                     _error.value = "Failed to load songs: ${response.code()}"
@@ -59,6 +64,7 @@ class SongViewModel : ViewModel() {
                 if (response.isSuccessful) {
                     // After calling next, reload the playlist to sync with server
                     reloadPlaylist()
+                    _isPlaying.value = true // Auto-play after next
                 } else {
                     _error.value = "Failed to go to next song: ${response.code()}"
                 }
@@ -80,6 +86,7 @@ class SongViewModel : ViewModel() {
                 if (response.isSuccessful) {
                     // After calling previous, reload the playlist to sync with server
                     reloadPlaylist()
+                    _isPlaying.value = true // Auto-play after previous
                 } else {
                     _error.value = "Failed to go to previous song: ${response.code()}"
                 }
@@ -101,12 +108,12 @@ class SongViewModel : ViewModel() {
                     _songs.value = convertedSongs
 
                     // Always set the first song as current after next/previous
-                    // because the server moves songs between tocar/tocado lists
                     if (convertedSongs.isNotEmpty()) {
                         setCurrentSong(0)
                     } else {
                         _currentSong.value = null
                         _currentSongPosition.value = -1
+                        _isPlaying.value = false
                     }
                 }
             } catch (e: Exception) {
@@ -129,12 +136,25 @@ class SongViewModel : ViewModel() {
             _error.value = null
 
             try {
-                // First, find the position of the song in the current list
+                // Since we don't have a direct play endpoint, we'll use next/previous to navigate
+                // Find the position of the song in the current list
                 val songsList = _songs.value ?: emptyList()
                 val position = songsList.indexOfFirst { it.uuid == song.uuid }
 
                 if (position != -1) {
+                    // If it's not the current song, we need to navigate to it
+                    // For now, let's just set it as current and resume playback
                     setCurrentSong(position)
+
+                    // Resume playback if not already playing
+                    if (!(_isPlaying.value ?: false)) {
+                        val response = RetrofitInstance.apiService.resumeSong()
+                        if (response.isSuccessful) {
+                            _isPlaying.value = true
+                        } else {
+                            _error.value = "Failed to resume song: ${response.code()}"
+                        }
+                    }
                 }
             } catch (e: Exception) {
                 _error.value = "Error playing song: ${e.message}"
@@ -144,10 +164,47 @@ class SongViewModel : ViewModel() {
         }
     }
 
+    fun togglePlayPause() {
+        viewModelScope.launch {
+            _isLoading.value = true
+            _error.value = null
+
+            try {
+                val currentPlaying = _isPlaying.value ?: false
+                if (currentPlaying) {
+                    // If currently playing, pause it
+                    val response = RetrofitInstance.apiService.pauseSong()
+                    if (response.isSuccessful) {
+                        _isPlaying.value = false
+                    } else {
+                        _error.value = "Failed to pause song: ${response.code()}"
+                    }
+                } else {
+                    // If currently paused, resume it
+                    val response = RetrofitInstance.apiService.resumeSong()
+                    if (response.isSuccessful) {
+                        _isPlaying.value = true
+                    } else {
+                        _error.value = "Failed to resume song: ${response.code()}"
+                    }
+                }
+            } catch (e: Exception) {
+                _error.value = "Error toggling play/pause: ${e.message}"
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
     fun pauseSong() {
         viewModelScope.launch {
             try {
-                RetrofitInstance.apiService.pauseSong()
+                val response = RetrofitInstance.apiService.pauseSong()
+                if (response.isSuccessful) {
+                    _isPlaying.value = false
+                } else {
+                    _error.value = "Failed to pause song: ${response.code()}"
+                }
             } catch (e: Exception) {
                 _error.value = "Error pausing song: ${e.message}"
             }
@@ -157,7 +214,12 @@ class SongViewModel : ViewModel() {
     fun resumeSong() {
         viewModelScope.launch {
             try {
-                RetrofitInstance.apiService.resumeSong()
+                val response = RetrofitInstance.apiService.resumeSong()
+                if (response.isSuccessful) {
+                    _isPlaying.value = true
+                } else {
+                    _error.value = "Failed to resume song: ${response.code()}"
+                }
             } catch (e: Exception) {
                 _error.value = "Error resuming song: ${e.message}"
             }
@@ -167,7 +229,12 @@ class SongViewModel : ViewModel() {
     fun stopSong() {
         viewModelScope.launch {
             try {
-                RetrofitInstance.apiService.stopSong()
+                val response = RetrofitInstance.apiService.stopSong()
+                if (response.isSuccessful) {
+                    _isPlaying.value = false
+                } else {
+                    _error.value = "Failed to stop song: ${response.code()}"
+                }
             } catch (e: Exception) {
                 _error.value = "Error stopping song: ${e.message}"
             }

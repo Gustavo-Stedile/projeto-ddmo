@@ -14,7 +14,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var songAdapter: SongAdapter
     private val songList = mutableListOf<Song>()
     private val viewModel: SongViewModel by viewModels()
-    private var isPlaying = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -33,8 +32,7 @@ class MainActivity : AppCompatActivity() {
         songAdapter = SongAdapter(
             songs = songList,
             onItemClick = { song ->
-                // When a song is clicked, it should become the current song
-                // In a real implementation, you might want to call a play endpoint
+                // When a song is clicked, play it
                 viewModel.playSong(song)
             },
             onMenuClick = { song ->
@@ -59,17 +57,10 @@ class MainActivity : AppCompatActivity() {
             viewModel.previousSong()
         }
 
-        // Play/Pause button
+        // Play/Pause button - use toggle function
         val playPauseButton = findViewById<android.widget.ImageButton>(R.id.button_play_pause)
         playPauseButton.setOnClickListener {
-            if (isPlaying) {
-                viewModel.pauseSong()
-                playPauseButton.setImageResource(android.R.drawable.ic_media_play)
-            } else {
-                viewModel.resumeSong()
-                playPauseButton.setImageResource(android.R.drawable.ic_media_pause)
-            }
-            isPlaying = !isPlaying
+            viewModel.togglePlayPause()
         }
     }
 
@@ -78,13 +69,6 @@ class MainActivity : AppCompatActivity() {
             songList.clear()
             songList.addAll(songs)
             songAdapter.updateSongs(songList)
-
-            // Update play/pause button state based on whether we have songs
-            val playPauseButton = findViewById<android.widget.ImageButton>(R.id.button_play_pause)
-            if (songs.isEmpty()) {
-                playPauseButton.setImageResource(android.R.drawable.ic_media_play)
-                isPlaying = false
-            }
         }
 
         viewModel.currentSong.observe(this) { song ->
@@ -100,14 +84,16 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        viewModel.isPlaying.observe(this) { isPlaying ->
+            updatePlayPauseButton(isPlaying)
+        }
+
         viewModel.isLoading.observe(this) { isLoading ->
             // Handle loading state if needed
-            // You can show/hide progress bar here
         }
 
         viewModel.error.observe(this) { error ->
             error?.let {
-                // Handle error state - show toast or error message
                 android.widget.Toast.makeText(this, it, android.widget.Toast.LENGTH_SHORT).show()
             }
         }
@@ -118,11 +104,15 @@ class MainActivity : AppCompatActivity() {
         findViewById<android.widget.TextView>(R.id.text_current_title).text = song.title
         findViewById<android.widget.TextView>(R.id.text_current_artist).text = song.artist
         findViewById<android.widget.TextView>(R.id.text_current_duration).text = song.duration
+    }
 
-        // Update play/pause button to show pause icon when a song is current
+    private fun updatePlayPauseButton(isPlaying: Boolean) {
         val playPauseButton = findViewById<android.widget.ImageButton>(R.id.button_play_pause)
-        playPauseButton.setImageResource(android.R.drawable.ic_media_pause)
-        isPlaying = true
+        if (isPlaying) {
+            playPauseButton.setImageResource(android.R.drawable.ic_media_pause)
+        } else {
+            playPauseButton.setImageResource(android.R.drawable.ic_media_play)
+        }
     }
 
     private fun loadSongs() {
