@@ -66,7 +66,7 @@ class SongViewModel : ViewModel() {
                     reloadPlaylist()
                     _isPlaying.value = true // Auto-play after next
                 } else {
-                    _error.value = "Failed to go to next song: ${response.code()}"
+                    // _error.value = "Failed to go to next song: ${response.code()}"
                 }
             } catch (e: Exception) {
                 _error.value = "Error: ${e.message}"
@@ -88,7 +88,7 @@ class SongViewModel : ViewModel() {
                     reloadPlaylist()
                     _isPlaying.value = true // Auto-play after previous
                 } else {
-                    _error.value = "Failed to go to previous song: ${response.code()}"
+                    // _error.value = "Failed to go to previous song: ${response.code()}"
                 }
             } catch (e: Exception) {
                 _error.value = "Error: ${e.message}"
