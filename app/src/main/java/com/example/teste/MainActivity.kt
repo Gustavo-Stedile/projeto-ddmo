@@ -1,5 +1,6 @@
 package com.example.teste
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
@@ -20,11 +21,26 @@ class MainActivity : AppCompatActivity() {
         enableEdgeToEdge()
         setContentView(R.layout.activity_main)
 
+        loadSongs()
         setupRecyclerView()
         setupButtonListeners()
         setupObservers()
-        loadSongs()
+
+        setupNavigation()
     }
+
+    override fun onResume() {
+        super.onResume()
+        updatePlayPauseButton(viewModel.isPlaying.value!!)
+        refreshPlaylist()
+    }
+
+    private fun refreshPlaylist() {
+        lifecycleScope.launch {
+            viewModel.loadSongs()
+        }
+    }
+
 
     private fun setupRecyclerView() {
         val recyclerView = findViewById<RecyclerView>(R.id.recycler_playlist)
@@ -118,6 +134,13 @@ class MainActivity : AppCompatActivity() {
     private fun loadSongs() {
         lifecycleScope.launch {
             viewModel.loadSongs()
+        }
+    }
+
+    private fun setupNavigation() {
+        findViewById<com.google.android.material.floatingactionbutton.FloatingActionButton>(R.id.fab_add_songs).setOnClickListener {
+            val intent = Intent(this, AddSongActivity::class.java)
+            startActivity(intent)
         }
     }
 }

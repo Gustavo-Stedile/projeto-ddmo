@@ -7,6 +7,13 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.launch
 
 class SongViewModel : ViewModel() {
+
+    private val _availableSongs = MutableLiveData<List<Song>>()
+    val availableSongs: LiveData<List<Song>> get() = _availableSongs
+
+    private val _songAdded = MutableLiveData<Boolean>()
+    val songAdded: LiveData<Boolean> get() = _songAdded
+
     private val _songs = MutableLiveData<List<Song>>()
     val songs: LiveData<List<Song>> get() = _songs
 
@@ -40,14 +47,58 @@ class SongViewModel : ViewModel() {
                     // Set first song as current song but don't auto-play
                     if (convertedSongs.isNotEmpty()) {
                         setCurrentSong(0)
-                        // Set initial state to paused
-                        _isPlaying.value = false
                     }
                 } else {
                     _error.value = "Failed to load songs: ${response.code()}"
                 }
             } catch (e: Exception) {
                 _error.value = "Error: ${e.message}"
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    fun loadAvailableSongs() {
+        viewModelScope.launch {
+            _isLoading.value = true
+            _error.value = null
+
+            try {
+                val response = RetrofitInstance.apiService.getAvailableSongs()
+                if (response.isSuccessful) {
+                    val songResponses = response.body() ?: emptyList()
+                    val convertedSongs = convertToSongList(songResponses)
+                    _availableSongs.value = convertedSongs
+                } else {
+                    _error.value = "Failed to load available songs: ${response.code()}"
+                }
+            } catch (e: Exception) {
+                _error.value = "Error loading available songs: ${e.message}"
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    fun addSongToPlaylist(uuid: String) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            _error.value = null
+
+            try {
+                val response = RetrofitInstance.apiService.addSongToPlaylist(uuid)
+                if (response.isSuccessful) {
+                    _songAdded.value = true
+                    // Reload the playlist to reflect changes
+                    reloadPlaylist()
+                } else {
+                    _error.value = "Failed to add song to playlist: ${response.code()}"
+                    _songAdded.value = false
+                }
+            } catch (e: Exception) {
+                _error.value = "Error adding song to playlist: ${e.message}"
+                _songAdded.value = false
             } finally {
                 _isLoading.value = false
             }
